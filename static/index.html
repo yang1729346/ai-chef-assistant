@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI 私人厨师</title>
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--sidebar-w:280px;--primary:#f97316;--primary-dark:#ea580c;--primary-light:#fed7aa;--bg-warm:#fff7ed;--glass:rgba(255,255,255,0.85);--glass-border:rgba(255,255,255,0.5);--text:#1f2937;--text-light:#6b7280;--text-lighter:#9ca3af;--shadow:0 8px 32px rgba(0,0,0,0.08)}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:var(--text);background:linear-gradient(135deg,#fef3c7 0%,#ffedd5 50%,#fee2e2 100%);min-height:100vh;overflow:hidden}
+.app{display:flex;height:100vh;width:100vw}
+
+/* Sidebar */
+.sidebar{width:var(--sidebar-w);min-width:var(--sidebar-w);height:100vh;background:var(--glass);backdrop-filter:blur(20px);border-right:1px solid rgba(0,0,0,0.06);display:flex;flex-direction:column;transition:margin-left 0.3s;z-index:40}
+.sidebar-header{padding:20px 16px 12px;border-bottom:1px solid rgba(0,0,0,0.06)}
+.sidebar-header h1{font-size:18px;font-weight:700;background:linear-gradient(135deg,var(--primary),#dc2626);-webkit-background-clip:text;-webkit-text-fill-color:transparent;display:flex;align-items:center;gap:8px}
+.sidebar-header p{font-size:12px;color:var(--text-light);margin-top:2px}
+.new-chat-btn{display:flex;align-items:center;gap:8px;margin:12px 16px;padding:10px 16px;background:linear-gradient(135deg,var(--primary),#dc2626);color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:500;cursor:pointer;transition:all 0.2s;box-shadow:0 4px 12px rgba(249,115,22,0.3)}
+.new-chat-btn:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(249,115,22,0.4)}
+.sidebar-section{padding:8px 0;flex:1;overflow-y:auto}
+.sidebar-section-title{padding:8px 16px;font-size:11px;font-weight:600;color:var(--text-lighter);text-transform:uppercase;letter-spacing:0.5px}
+.context-item{padding:10px 16px;cursor:pointer;transition:background 0.15s;border-left:3px solid transparent;position:relative}
+.context-item:hover{background:rgba(249,115,22,0.06)}
+.context-item.active{background:rgba(249,115,22,0.1);border-left-color:var(--primary)}
+.context-item-name{font-size:14px;font-weight:500;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:24px}
+.context-item-desc{font-size:12px;color:var(--text-light);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.context-item-delete{position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--text-lighter);cursor:pointer;padding:4px;border-radius:4px;opacity:0;transition:all 0.15s;font-size:16px}
+.context-item:hover .context-item-delete{opacity:1}
+.context-item-delete:hover{color:#ef4444;background:rgba(239,68,68,0.1)}
+.sidebar-empty{padding:24px 16px;text-align:center;color:var(--text-lighter);font-size:13px}
+
+/* Main */
+.main{flex:1;display:flex;flex-direction:column;height:100vh;min-width:0;position:relative}
+
+/* Header */
+.header{padding:12px 20px;background:var(--glass);backdrop-filter:blur(20px);border-bottom:1px solid rgba(0,0,0,0.06);display:flex;align-items:center;gap:12px;z-index:10}
+.toggle-sidebar-btn{display:none;background:none;border:none;color:var(--text);cursor:pointer;padding:6px;border-radius:8px}
+.toggle-sidebar-btn:hover{background:rgba(0,0,0,0.05)}
+.header-title{font-size:16px;font-weight:600}
+.header-desc{font-size:12px;color:var(--text-light)}
+
+/* Chat Area */
+.chat-area{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:16px}
+.welcome{text-align:center;color:var(--text-light);margin:auto}
+.welcome-icon{width:64px;height:64px;background:var(--glass);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 16px}
+.welcome h2{font-size:18px;font-weight:600;color:var(--text);margin-bottom:8px}
+.welcome p{font-size:14px}
+
+/* Messages */
+.message{display:flex;gap:12px;max-width:85%;animation:fadeIn 0.3s}
+.message.user{align-self:flex-end;flex-direction:row-reverse}
+.message-avatar{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:14px}
+.message.assistant .message-avatar{background:linear-gradient(135deg,var(--primary),#dc2626);color:#fff}
+.message.user .message-avatar{background:#e5e7eb;color:var(--text)}
+.message-bubble{padding:12px 16px;border-radius:16px;font-size:14px;line-height:1.6;word-break:break-word}
+.message.user .message-bubble{background:linear-gradient(135deg,var(--primary),var(--primary-dark));color:#fff;border-bottom-right-radius:4px}
+.message.assistant .message-bubble{background:var(--glass);border:1px solid rgba(0,0,0,0.06);border-bottom-left-radius:4px}
+.message-bubble img{max-width:100%;border-radius:8px;margin:8px 0}
+.message-bubble h1,.message-bubble h2,.message-bubble h3{margin:12px 0 6px;font-size:15px}
+.message-bubble h1{font-size:17px}
+.message-bubble h2{font-size:16px}
+.message-bubble p{margin:4px 0}
+.message-bubble ul,.message-bubble ol{margin:8px 0;padding-left:20px}
+.message-bubble li{margin:2px 0}
+.message-bubble code{background:rgba(0,0,0,0.06);padding:2px 6px;border-radius:4px;font-size:13px}
+.message-bubble pre{background:rgba(0,0,0,0.04);padding:12px;border-radius:8px;overflow-x:auto;margin:8px 0}
+.message-bubble pre code{background:none;padding:0}
+.message-bubble strong{font-weight:600}
+.message-bubble blockquote{border-left:3px solid var(--primary-light);padding-left:12px;margin:8px 0;color:var(--text-light)}
+.message-bubble a{color:var(--primary);text-decoration:underline}
+.message-bubble table{border-collapse:collapse;width:100%;margin:8px 0}
+.message-bubble th,.message-bubble td{border:1px solid rgba(0,0,0,0.1);padding:6px 10px;font-size:13px}
+.message-bubble th{background:rgba(0,0,0,0.03)}
+.typing-indicator{display:flex;gap:4px;padding:8px 0}
+.typing-indicator span{width:6px;height:6px;background:var(--text-lighter);border-radius:50%;animation:typing 1.4s infinite}
+.typing-indicator span:nth-child(2){animation-delay:0.2s}
+.typing-indicator span:nth-child(3){animation-delay:0.4s}
+@keyframes typing{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-6px)}}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+/* Input */
+.input-area{padding:12px 20px 20px;background:transparent}
+.input-card{background:var(--glass);backdrop-filter:blur(20px);border:1px solid rgba(0,0,0,0.06);border-radius:16px;box-shadow:var(--shadow);overflow:hidden}
+.image-preview{display:none;padding:8px 12px;border-bottom:1px solid rgba(0,0,0,0.06);position:relative}
+.image-preview img{height:80px;border-radius:8px;object-fit:cover}
+.image-preview .remove-img{position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.6);color:#fff;border:none;border-radius:50%;width:24px;height:24px;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center}
+.input-row{display:flex;align-items:flex-end;padding:8px;gap:4px}
+.input-row textarea{flex:1;background:transparent;border:none;padding:8px 12px;font-size:14px;resize:none;outline:none;line-height:1.5;max-height:120px;font-family:inherit}
+.input-row button{background:none;border:none;padding:8px;border-radius:10px;cursor:pointer;transition:all 0.15s;color:var(--text-light);display:flex;align-items:center;justify-content:center}
+.input-row button:hover{background:rgba(0,0,0,0.05)}
+.send-btn{background:linear-gradient(135deg,var(--primary),#dc2626)!important;color:#fff!important;padding:8px!important;border-radius:12px!important;box-shadow:0 2px 8px rgba(249,115,22,0.3)}
+.send-btn:hover{box-shadow:0 4px 12px rgba(249,115,22,0.4)!important;background:linear-gradient(135deg,var(--primary-dark),#c2410c)!important}
+.send-btn:disabled{background:rgba(0,0,0,0.1)!important;box-shadow:none!important;cursor:not-allowed;color:var(--text-lighter)!important}
+
+/* Memory Panel */
+.memory-panel{position:fixed;right:0;top:0;bottom:0;width:360px;background:var(--glass);backdrop-filter:blur(20px);border-left:1px solid rgba(0,0,0,0.06);z-index:50;transform:translateX(100%);transition:transform 0.3s;display:flex;flex-direction:column;box-shadow:-8px 0 32px rgba(0,0,0,0.08)}
+.memory-panel.open{transform:translateX(0)}
+.memory-panel-header{padding:16px 20px;border-bottom:1px solid rgba(0,0,0,0.06);display:flex;align-items:center;justify-content:space-between}
+.memory-panel-header h3{font-size:16px;font-weight:600}
+.memory-panel-close{background:none;border:none;color:var(--text-light);cursor:pointer;padding:6px;border-radius:8px;font-size:18px}
+.memory-panel-close:hover{background:rgba(0,0,0,0.05)}
+.memory-panel-body{flex:1;overflow-y:auto;padding:16px 20px}
+.memory-content-item{background:rgba(0,0,0,0.03);border-radius:10px;padding:12px;margin-bottom:10px}
+.memory-content-type{font-size:11px;font-weight:600;color:var(--primary);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px}
+.memory-content-data{font-size:13px;line-height:1.5;color:var(--text)}
+.memory-content-time{font-size:11px;color:var(--text-lighter);margin-top:6px}
+
+/* Overlay */
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.2);z-index:35}
+
+/* Responsive */
+@media(max-width:768px){
+  .sidebar{position:fixed;left:0;top:0;bottom:0;z-index:40;box-shadow:var(--shadow)}
+  .sidebar.collapsed{margin-left:calc(-1 * var(--sidebar-w))}
+  .toggle-sidebar-btn{display:block}
+  .overlay.show{display:block}
+  .memory-panel{width:100%}
+}
+
+/* Scrollbar */
+::-webkit-scrollbar{width:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:rgba(0,0,0,0.1);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:rgba(0,0,0,0.2)}
+
+/* Toast */
+.toast{position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:var(--text);color:#fff;padding:10px 20px;border-radius:10px;font-size:13px;z-index:100;animation:toastIn 0.3s;pointer-events:none}
+@keyframes toastIn{from{opacity:0;transform:translateX(-50%) translateY(10px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <h1>🍳 AI 私人厨师</h1>
+      <p>个性化食谱推荐助手</p>
+    </div>
+    <button class="new-chat-btn" onclick="newChat()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+      新建会话
+    </button>
+    <div class="sidebar-section">
+      <div class="sidebar-section-title">历史会话</div>
+      <div id="contextList">
+        <div class="sidebar-empty">暂无会话</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Overlay for mobile -->
+  <div class="overlay" id="overlay" onclick="toggleSidebar()"></div>
+
+  <!-- Main -->
+  <div class="main">
+    <div class="header">
+      <button class="toggle-sidebar-btn" onclick="toggleSidebar()">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+      </button>
+      <div>
+        <div class="header-title" id="chatTitle">新会话</div>
+        <div class="header-desc" id="chatDesc">开始对话吧</div>
+      </div>
+      <div style="margin-left:auto;display:flex;gap:4px">
+        <button onclick="toggleMemoryPanel()" title="查看记忆" style="background:none;border:none;color:var(--text-light);cursor:pointer;padding:6px;border-radius:8px" onmouseover="this.style.background='rgba(0,0,0,0.05)'" onmouseout="this.style.background='none'">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+        </button>
+        <button onclick="clearCurrentChat()" title="清空消息" style="background:none;border:none;color:var(--text-light);cursor:pointer;padding:6px;border-radius:8px" onmouseover="this.style.background='rgba(0,0,0,0.05)'" onmouseout="this.style.background='none'">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="chat-area" id="chatArea">
+      <div class="welcome" id="welcome">
+        <div class="welcome-icon">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#f97316" stroke-width="2" stroke-linecap="round"><path d="M6 13.876V19a2 2 0 0 0 2 2h3.28c.213 0 .42-.07.59-.196l1.86-1.395a1 1 0 0 1 1.54.825V21a1 1 0 0 0 1 1H18a2 2 0 0 0 2-2v-5.176"/><ellipse cx="12" cy="9" rx="7" ry="5.5"/><path d="M5.424 15.554l-1.9 2.424a1 1 0 0 0 .788 1.613h15.376a1 1 0 0 0 .788-1.613l-1.9-2.424"/></svg>
+        </div>
+        <h2>欢迎来到 AI 私人厨师</h2>
+        <p>上传食材图片或描述您有的食材，获取个性化食谱推荐</p>
+      </div>
+    </div>
+
+    <div class="input-area">
+      <div class="input-card">
+        <div class="image-preview" id="imagePreview">
+          <img id="previewImg" src="" alt="预览">
+          <button class="remove-img" onclick="removeImage()">&times;</button>
+        </div>
+        <div class="input-row">
+          <button onclick="document.getElementById('imageInput').click()" title="上传图片">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+          </button>
+          <input type="file" id="imageInput" accept="image/*" style="display:none" onchange="handleImage(event)">
+          <textarea id="messageInput" placeholder="描述你有的食材..." rows="1" onkeydown="handleKeyDown(event)" oninput="autoResize(this)"></textarea>
+          <button class="send-btn" id="sendBtn" onclick="sendMessage()" disabled>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"/><path d="m21.854 2.147-10.94 10.939"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Memory Panel -->
+  <div class="memory-panel" id="memoryPanel">
+    <div class="memory-panel-header">
+      <h3>记忆内容</h3>
+      <button class="memory-panel-close" onclick="toggleMemoryPanel()">&times;</button>
+    </div>
+    <div class="memory-panel-body" id="memoryBody">
+      <div style="text-align:center;color:var(--text-lighter);font-size:13px;padding:20px 0">选择一个会话查看记忆内容</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = '';
+let currentThreadId = null;
+let currentImageData = null;
+let isStreaming = false;
+let contextCache = [];
+
+// Init
+document.addEventListener('DOMContentLoaded', () => {
+  loadContexts();
+  document.getElementById('messageInput').addEventListener('input', function() {
+    document.getElementById('sendBtn').disabled = !this.value.trim() && !currentImageData;
+  });
+});
+
+// Contexts
+async function loadContexts() {
+  try {
+    const res = await fetch(API + '/api/v1/chat/memory-contexts');
+    const data = await res.json();
+    contextCache = data.contexts || [];
+    renderContexts();
+  } catch(e) {
+    console.error('Load contexts failed:', e);
+  }
+}
+
+function renderContexts() {
+  const el = document.getElementById('contextList');
+  if (!contextCache.length) {
+    el.innerHTML = '<div class="sidebar-empty">暂无会话</div>';
+    return;
+  }
+  el.innerHTML = contextCache.map(c => `
+    <div class="context-item ${c.id === currentThreadId ? 'active' : ''}" onclick="switchContext('${c.id}')">
+      <div class="context-item-name">${esc(c.name)}</div>
+      <div class="context-item-desc">${esc(c.description || c.id)}</div>
+      <button class="context-item-delete" onclick="event.stopPropagation();deleteContext('${c.id}')" title="删除">&times;</button>
+    </div>
+  `).join('');
+}
+
+async function switchContext(id) {
+  currentThreadId = id;
+  const ctx = contextCache.find(c => c.id === id);
+  document.getElementById('chatTitle').textContent = ctx ? ctx.name : '会话';
+  document.getElementById('chatDesc').textContent = ctx ? (ctx.description || '') : '';
+  renderContexts();
+  await loadMessages();
+  if (window.innerWidth <= 768) toggleSidebar();
+}
+
+async function loadMessages() {
+  if (!currentThreadId) return;
+  const chatArea = document.getElementById('chatArea');
+  chatArea.innerHTML = '';
+  try {
+    const res = await fetch(API + '/api/v1/chat/messages?thread_id=' + currentThreadId);
+    const data = await res.json();
+    const msgs = data.messages || [];
+    if (!msgs.length) {
+      chatArea.innerHTML = createWelcome();
+      return;
+    }
+    msgs.forEach(m => appendMessage(m.role, m.content));
+    scrollToBottom();
+  } catch(e) {
+    console.error('Load messages failed:', e);
+  }
+}
+
+function newChat() {
+  const id = 'thread-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
+  currentThreadId = id;
+  currentImageData = null;
+  document.getElementById('imagePreview').style.display = 'none';
+  document.getElementById('chatTitle').textContent = '新会话';
+  document.getElementById('chatDesc').textContent = '开始对话吧';
+  const chatArea = document.getElementById('chatArea');
+  chatArea.innerHTML = createWelcome();
+  renderContexts();
+  document.getElementById('messageInput').value = '';
+  document.getElementById('sendBtn').disabled = true;
+}
+
+async function deleteContext(id) {
+  if (!confirm('确定删除此会话？')) return;
+  try {
+    await fetch(API + '/api/v1/chat/memory-contexts/' + id, { method: 'DELETE' });
+    if (currentThreadId === id) {
+      currentThreadId = null;
+      document.getElementById('chatTitle').textContent = '新会话';
+      document.getElementById('chatDesc').textContent = '开始对话吧';
+      document.getElementById('chatArea').innerHTML = createWelcome();
+    }
+    await loadContexts();
+    toast('已删除');
+  } catch(e) {
+    toast('删除失败');
+  }
+}
+
+async function clearCurrentChat() {
+  if (!currentThreadId) return;
+  if (!confirm('确定清空消息？')) return;
+  try {
+    await fetch(API + '/api/v1/chat/messages?thread_id=' + currentThreadId, { method: 'DELETE' });
+    document.getElementById('chatArea').innerHTML = createWelcome();
+    toast('已清空');
+  } catch(e) {
+    toast('清空失败');
+  }
+}
+
+// Chat
+async function sendMessage() {
+  const input = document.getElementById('messageInput');
+  const text = input.value.trim();
+  if ((!text && !currentImageData) || isStreaming || !currentThreadId) return;
+
+  isStreaming = true;
+  document.getElementById('sendBtn').disabled = true;
+  document.getElementById('welcome')?.remove();
+
+  // Create context if first message
+  const ctx = contextCache.find(c => c.id === currentThreadId);
+  if (!ctx) {
+    try {
+      await fetch(API + `/api/v1/chat/memory-contexts?context_id=${currentThreadId}&name=${encodeURIComponent('会话_' + currentThreadId.slice(0,8))}&description=${encodeURIComponent('开始于' + new Date().toLocaleString())}`, { method: 'POST' });
+      await loadContexts();
+    } catch(e) {}
+  }
+
+  // Show user message
+  const userContent = currentImageData ? `<img src="${currentImageData}" style="max-height:150px;display:block;margin-bottom:8px">${esc(text)}` : esc(text);
+  appendMessage('user', userContent, true);
+
+  const msgText = text || '请查看图片中的食材并推荐食谱';
+  const image = currentImageData || '';
+
+  // Clear input
+  input.value = '';
+  input.style.height = 'auto';
+  removeImage();
+  document.getElementById('sendBtn').disabled = true;
+
+  // Show typing
+  const typingId = showTyping();
+  scrollToBottom();
+
+  // Send request
+  try {
+    const res = await fetch(API + '/api/v1/chat/stream', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: msgText, image_url: image, thread_id: currentThreadId })
+    });
+
+    removeTyping(typingId);
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let assistantEl = null;
+    let fullText = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const chunk = decoder.decode(value, { stream: true });
+      fullText += chunk;
+      if (!assistantEl) {
+        assistantEl = appendMessage('assistant', '', false);
+      }
+      assistantEl.querySelector('.message-bubble').innerHTML = renderMarkdown(fullText);
+      scrollToBottom();
+    }
+
+    // Refresh memory contexts after chat
+    await loadContexts();
+    // Refresh memory panel if open
+    if (document.getElementById('memoryPanel').classList.contains('open')) {
+      loadMemoryContents();
+    }
+  } catch(e) {
+    removeTyping(typingId);
+    appendMessage('assistant', '信息检索失败，请重试', false);
+    console.error('Chat error:', e);
+  }
+
+  isStreaming = false;
+  document.getElementById('sendBtn').disabled = true;
+}
+
+// Image handling
+function handleImage(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(ev) {
+    currentImageData = ev.target.result;
+    document.getElementById('previewImg').src = currentImageData;
+    document.getElementById('imagePreview').style.display = 'block';
+    document.getElementById('sendBtn').disabled = false;
+  };
+  reader.readAsDataURL(file);
+  e.target.value = '';
+}
+
+function removeImage() {
+  currentImageData = null;
+  document.getElementById('imagePreview').style.display = 'none';
+  document.getElementById('previewImg').src = '';
+  const input = document.getElementById('messageInput');
+  document.getElementById('sendBtn').disabled = !input.value.trim();
+}
+
+// UI helpers
+function appendMessage(role, content, isRaw) {
+  const chatArea = document.getElementById('chatArea');
+  const div = document.createElement('div');
+  div.className = 'message ' + role;
+  const avatar = role === 'user' ? '👤' : '🍳';
+  div.innerHTML = `
+    <div class="message-avatar">${avatar}</div>
+    <div class="message-bubble">${isRaw ? content : renderMarkdown(content)}</div>
+  `;
+  chatArea.appendChild(div);
+  return div;
+}
+
+function showTyping() {
+  const chatArea = document.getElementById('chatArea');
+  const div = document.createElement('div');
+  div.className = 'message assistant';
+  div.id = 'typing-' + Date.now();
+  div.innerHTML = `
+    <div class="message-avatar">🍳</div>
+    <div class="message-bubble"><div class="typing-indicator"><span></span><span></span><span></span></div></div>
+  `;
+  chatArea.appendChild(div);
+  return div.id;
+}
+
+function removeTyping(id) {
+  document.getElementById(id)?.remove();
+}
+
+function scrollToBottom() {
+  const chatArea = document.getElementById('chatArea');
+  requestAnimationFrame(() => chatArea.scrollTop = chatArea.scrollHeight);
+}
+
+function createWelcome() {
+  return `<div class="welcome" id="welcome">
+    <div class="welcome-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#f97316" stroke-width="2" stroke-linecap="round"><path d="M6 13.876V19a2 2 0 0 0 2 2h3.28c.213 0 .42-.07.59-.196l1.86-1.395a1 1 0 0 1 1.54.825V21a1 1 0 0 0 1 1H18a2 2 0 0 0 2-2v-5.176"/><ellipse cx="12" cy="9" rx="7" ry="5.5"/><path d="M5.424 15.554l-1.9 2.424a1 1 0 0 0 .788 1.613h15.376a1 1 0 0 0 .788-1.613l-1.9-2.424"/></svg></div>
+    <h2>欢迎来到 AI 私人厨师</h2>
+    <p>上传食材图片或描述您有的食材，获取个性化食谱推荐</p>
+  </div>`;
+}
+
+// Memory Panel
+function toggleMemoryPanel() {
+  document.getElementById('memoryPanel').classList.toggle('open');
+  if (document.getElementById('memoryPanel').classList.contains('open')) {
+    loadMemoryContents();
+  }
+}
+
+async function loadMemoryContents() {
+  const body = document.getElementById('memoryBody');
+  if (!currentThreadId) {
+    body.innerHTML = '<div style="text-align:center;color:var(--text-lighter);font-size:13px;padding:20px 0">选择一个会话查看记忆内容</div>';
+    return;
+  }
+  try {
+    const res = await fetch(API + '/api/v1/chat/memory-contents?thread_id=' + currentThreadId);
+    const data = await res.json();
+    const contents = data.contents || [];
+    if (!contents.length) {
+      body.innerHTML = '<div style="text-align:center;color:var(--text-lighter);font-size:13px;padding:20px 0">暂无记忆内容</div>';
+      return;
+    }
+    body.innerHTML = contents.map(c => {
+      const typeLabel = c.content_type === 'user_input' ? '用户输入' : c.content_type === 'assistant_reply' ? 'AI 回复' : c.content_type;
+      let dataHtml = '';
+      if (c.content_data) {
+        if (c.content_data.prompt) dataHtml += `<div>${esc(c.content_data.prompt)}</div>`;
+        if (c.content_data.image) dataHtml += `<div style="margin-top:4px"><img src="${c.content_data.image}" style="max-height:80px;border-radius:6px"></div>`;
+        if (c.content_data.response) dataHtml += `<div style="margin-top:4px;white-space:pre-wrap">${esc(c.content_data.response)}</div>`;
+      }
+      return `<div class="memory-content-item">
+        <div class="memory-content-type">${esc(typeLabel)}</div>
+        <div class="memory-content-data">${dataHtml}</div>
+        <div class="memory-content-time">${c.created_at || ''}</div>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    body.innerHTML = '<div style="text-align:center;color:var(--text-lighter);font-size:13px;padding:20px 0">加载失败</div>';
+  }
+}
+
+// Sidebar toggle
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('collapsed');
+  document.getElementById('overlay').classList.toggle('show');
+}
+
+// Input helpers
+function autoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+}
+
+function handleKeyDown(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+}
+
+function esc(str) {
+  if (!str) return '';
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+// Simple markdown renderer
+function renderMarkdown(text) {
+  if (!text) return '';
+  let html = text;
+  // Code blocks
+  html = html.replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>');
+  // Inline code
+  html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+  // Bold
+  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  // Italic
+  html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+  // Headers
+  html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+  html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+  html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+  // Images
+  html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1">');
+  // Links
+  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
+  // Blockquotes
+  html = html.replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>');
+  // Line breaks
+  html = html.replace(/\n/g, '<br>');
+  return html;
+}
+
+function toast(msg) {
+  const el = document.createElement('div');
+  el.className = 'toast';
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 2000);
+}
+</script>
+</body>
+</html>

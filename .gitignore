@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.egg
+*.whl
+.venv/
+venv/
+env/
+
+# Environment
+.env
+.env.local
+
+# Database
+*.db
+*.sqlite
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Scratch files (not part of the project)
+Untitled-1.py
+Untitled-2.html
